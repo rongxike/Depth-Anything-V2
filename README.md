@@ -202,5 +202,9 @@ If you find this project useful, please consider citing:
 
 ## sample scripts
 ```bash
- .\.venv\Scripts\python.exe .\run_video.py --encoder vitb --video-path .\assets\examples_video\345355.mp4 --outdir .\vis_video_depth_test --grayscale
+# Linux/macOS
+./.venv/bin/python ./run_video.py --encoder vitl --video-path ./assets/examples_video/345355.mp4 --outdir ./outputs --grayscale
+
+# Windows
+.\.venv\Scripts\python.exe .\run_video.py --encoder vitb --video-path .\assets\examples_video\345355.mp4 --outdir .\outputs --grayscale
 ```
