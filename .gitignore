@@ -3,3 +3,4 @@ outputs/
 vis_video_depth_test/
 examples_video/
 checkpoints/
+inputs/

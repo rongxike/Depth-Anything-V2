@@ -117,9 +117,13 @@ python run.py --encoder vitl --img-path assets/examples --outdir depth_vis
 ```bash
 python run_video.py \
   --encoder <vits | vitb | vitl | vitg> \
-  --video-path assets/examples_video --outdir video_depth_vis \
-  [--input-size <size>] [--pred-only] [--grayscale]
+  [--video-path <file | directory | txt>] --outdir video_depth_vis \
+  [--input-size <size>] [--side-ratio <W:H | auto>] [--pred-only] [--grayscale]
 ```
+
+By default, `--video-path ./inputs` processes all files under the `inputs/` directory recursively.
+By default, `--side-ratio auto` preserves each source video's native aspect ratio. Set `--side-ratio 4:3` or `--side-ratio 3:4` only when you want a fixed centered crop for every panel.
+Existing output videos are skipped automatically.
 
 ***Our larger model has better temporal consistency on videos.***
 
@@ -203,7 +207,7 @@ If you find this project useful, please consider citing:
 ## sample scripts
 ```bash
 # Linux/macOS
-./.venv/bin/python ./run_video.py --encoder vitl --video-path ./assets/examples_video/345355.mp4 --outdir ./outputs --grayscale
+./.venv/bin/python ./run_video.py --encoder vitl --video-path ./inputs/bud1.mp4 --outdir ./outputs --grayscale
 
 # Windows
 .\.venv\Scripts\python.exe .\run_video.py --encoder vitb --video-path .\assets\examples_video\345355.mp4 --outdir .\outputs --grayscale

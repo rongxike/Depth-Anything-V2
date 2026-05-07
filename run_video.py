@@ -36,15 +36,33 @@ def center_crop_to_ratio(frame, ratio_w, ratio_h):
     return frame
 
 
+def build_output_path(filename, input_root, outdir):
+    if input_root is not None:
+        relative_path = os.path.relpath(filename, input_root)
+        stem, _ = os.path.splitext(relative_path)
+        return os.path.join(outdir, stem + '.mp4')
+    return os.path.join(outdir, os.path.splitext(os.path.basename(filename))[0] + '.mp4')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Depth Anything V2')
     
-    parser.add_argument('--video-path', type=str, required=True)
+    parser.add_argument(
+        '--video-path',
+        type=str,
+        default='./inputs',
+        help='video file, text file, or directory to process. Defaults to ./inputs',
+    )
     parser.add_argument('--input-size', type=int, default=518)
     parser.add_argument('--outdir', type=str, default='./vis_video_depth')
     
     parser.add_argument('--encoder', type=str, default='vitl', choices=['vits', 'vitb', 'vitl', 'vitg'])
-    parser.add_argument('--side-ratio', type=str, default='3:4', help='aspect ratio for each panel, format W:H')
+    parser.add_argument(
+        '--side-ratio',
+        type=str,
+        default='auto',
+        help='aspect ratio for each panel, format W:H. Defaults to auto to preserve the source video aspect ratio',
+    )
     parser.add_argument('--margin-width', type=int, default=0, help='separator width between original and depth panels')
     
     parser.add_argument('--pred-only', dest='pred_only', action='store_true', help='only display the prediction')
@@ -55,10 +73,12 @@ if __name__ == '__main__':
     if args.margin_width < 0:
         parser.error('--margin-width must be >= 0')
 
-    try:
-        ratio_w, ratio_h = parse_ratio(args.side_ratio)
-    except ValueError as err:
-        parser.error(str(err))
+    requested_ratio = None
+    if args.side_ratio.lower() != 'auto':
+        try:
+            requested_ratio = parse_ratio(args.side_ratio)
+        except ValueError as err:
+            parser.error(str(err))
     
     DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
     
@@ -68,6 +88,36 @@ if __name__ == '__main__':
         'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
         'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
     }
+
+    if os.path.isfile(args.video_path):
+        if args.video_path.endswith('txt'):
+            with open(args.video_path, 'r') as f:
+                filenames = [line for line in f.read().splitlines() if line]
+        else:
+            filenames = [args.video_path]
+    else:
+        filenames = sorted(
+            path for path in glob.glob(os.path.join(args.video_path, '**/*'), recursive=True)
+            if os.path.isfile(path)
+        )
+
+    if not filenames:
+        parser.error(f'No video files found for --video-path {args.video_path!r}.')
+    
+    os.makedirs(args.outdir, exist_ok=True)
+
+    input_root = args.video_path if os.path.isdir(args.video_path) else None
+    pending_videos = []
+    for filename in filenames:
+        output_path = build_output_path(filename, input_root, args.outdir)
+        if os.path.exists(output_path):
+            print(f'Skipping existing output: {output_path}')
+            continue
+        pending_videos.append((filename, output_path))
+
+    if not pending_videos:
+        print(f'All outputs already exist in {args.outdir}. Nothing to process.')
+        raise SystemExit(0)
 
     checkpoint_path = f'checkpoints/depth_anything_v2_{args.encoder}.pth'
     if not os.path.isfile(checkpoint_path):
@@ -80,28 +130,11 @@ if __name__ == '__main__':
     depth_anything.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
     depth_anything = depth_anything.to(DEVICE).eval()
     
-    if os.path.isfile(args.video_path):
-        if args.video_path.endswith('txt'):
-            with open(args.video_path, 'r') as f:
-                filenames = [line for line in f.read().splitlines() if line]
-        else:
-            filenames = [args.video_path]
-    else:
-        filenames = [
-            path for path in glob.glob(os.path.join(args.video_path, '**/*'), recursive=True)
-            if os.path.isfile(path)
-        ]
-
-    if not filenames:
-        parser.error(f'No video files found for --video-path {args.video_path!r}.')
-    
-    os.makedirs(args.outdir, exist_ok=True)
-    
     margin_width = args.margin_width
     cmap = matplotlib.colormaps.get_cmap('Spectral_r')
     
-    for k, filename in enumerate(filenames):
-        print(f'Progress {k+1}/{len(filenames)}: {filename}')
+    for k, (filename, output_path) in enumerate(pending_videos):
+        print(f'Progress {k+1}/{len(pending_videos)}: {filename}')
         
         raw_video = cv2.VideoCapture(filename)
         frame_width, frame_height = int(raw_video.get(cv2.CAP_PROP_FRAME_WIDTH)), int(raw_video.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -115,12 +148,17 @@ if __name__ == '__main__':
         if frame_rate <= 0:
             frame_rate = 30
 
-        if (frame_width / frame_height) > (ratio_w / ratio_h):
-            side_height = frame_height
-            side_width = int(round(frame_height * ratio_w / ratio_h))
-        else:
+        if requested_ratio is None:
             side_width = frame_width
-            side_height = int(round(frame_width * ratio_h / ratio_w))
+            side_height = frame_height
+        else:
+            ratio_w, ratio_h = requested_ratio
+            if (frame_width / frame_height) > (ratio_w / ratio_h):
+                side_height = frame_height
+                side_width = int(round(frame_height * ratio_w / ratio_h))
+            else:
+                side_width = frame_width
+                side_height = int(round(frame_width * ratio_h / ratio_w))
         
         if args.pred_only:
             output_width = side_width
@@ -129,7 +167,9 @@ if __name__ == '__main__':
             output_width = side_width * 2 + margin_width
             output_height = side_height
         
-        output_path = os.path.join(args.outdir, os.path.splitext(os.path.basename(filename))[0] + '.mp4')
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), frame_rate, (output_width, output_height))
         
         while raw_video.isOpened():
@@ -147,9 +187,14 @@ if __name__ == '__main__':
             else:
                 depth = (cmap(depth)[:, :, :3] * 255)[:, :, ::-1].astype(np.uint8)
 
-            # Keep both panels at exactly the requested aspect ratio via centered crop.
-            raw_panel = center_crop_to_ratio(raw_frame, ratio_w, ratio_h)
-            depth_panel = center_crop_to_ratio(depth, ratio_w, ratio_h)
+            if requested_ratio is None:
+                raw_panel = raw_frame
+                depth_panel = depth
+            else:
+                ratio_w, ratio_h = requested_ratio
+                # Keep both panels at exactly the requested aspect ratio via centered crop.
+                raw_panel = center_crop_to_ratio(raw_frame, ratio_w, ratio_h)
+                depth_panel = center_crop_to_ratio(depth, ratio_w, ratio_h)
             
             if args.pred_only:
                 out.write(depth_panel)
