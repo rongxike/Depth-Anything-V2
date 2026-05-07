@@ -1,0 +1,5 @@
+__pycache__/
+outputs/
+vis_video_depth_test/
+examples_video/
+checkpoints/

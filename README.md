@@ -34,12 +34,12 @@ This work presents Depth Anything V2. It significantly outperforms [V1](https://
 
 We provide **four models** of varying scales for robust relative depth estimation:
 
-| Model | Params | Checkpoint |
-|:-|-:|:-:|
-| Depth-Anything-V2-Small | 24.8M | [Download](https://huggingface.co/depth-anything/Depth-Anything-V2-Small/resolve/main/depth_anything_v2_vits.pth?download=true) |
-| Depth-Anything-V2-Base | 97.5M | [Download](https://huggingface.co/depth-anything/Depth-Anything-V2-Base/resolve/main/depth_anything_v2_vitb.pth?download=true) |
+| Model                   | Params |                                                           Checkpoint                                                            |
+| :---------------------- | -----: | :-----------------------------------------------------------------------------------------------------------------------------: |
+| Depth-Anything-V2-Small |  24.8M | [Download](https://huggingface.co/depth-anything/Depth-Anything-V2-Small/resolve/main/depth_anything_v2_vits.pth?download=true) |
+| Depth-Anything-V2-Base  |  97.5M | [Download](https://huggingface.co/depth-anything/Depth-Anything-V2-Base/resolve/main/depth_anything_v2_vitb.pth?download=true)  |
 | Depth-Anything-V2-Large | 335.3M | [Download](https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true) |
-| Depth-Anything-V2-Giant | 1.3B | Coming soon |
+| Depth-Anything-V2-Giant |   1.3B |                                                           Coming soon                                                           |
 
 
 ## Usage
@@ -198,4 +198,9 @@ If you find this project useful, please consider citing:
   booktitle={CVPR},
   year={2024}
 }
+```
+
+## sample scripts
+```bash
+ .\.venv\Scripts\python.exe .\run_video.py --encoder vitb --video-path .\assets\examples_video\345355.mp4 --outdir .\vis_video_depth_test --grayscale
 ```
